@@ -1,0 +1,50 @@
+/* src/components/Navbar.css (update) */
+
+.top-navbar {
+  height: 70px;
+  background: #061a3a;
+  border-bottom: 1px solid #0f2a5c;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 30px;
+}
+
+.logo {
+  color: #3bc1ff;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* .btn {
+  padding: 10px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+} */
+
+.btn {
+  padding: 10px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: none;
+  font-weight: 700;   /* 🔥 bold */
+  font-size: 14px;
+}
+.btn.primary {
+  background: #3bc1ff;
+  color: black;
+}
+
+.btn.outline {
+  background: transparent;
+  border: 1px solid #3bc1ff;
+  color: #3bc1ff;
+}

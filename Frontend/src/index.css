@@ -1,0 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+*{
+  padding: 0PX;
+  margin: 0PX;
+}
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  background: #061a3a;
+  color: white;
+}
