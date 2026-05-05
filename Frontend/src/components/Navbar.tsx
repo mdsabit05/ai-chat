@@ -1,13 +1,15 @@
-// src/components/Navbar.tsx
 import "./Navbar.css";
 
-export default function Navbar() {
+type Props = {
+  onLogout: () => void;
+};
+
+export default function Navbar({ onLogout }: Props) {
   return (
     <div className="top-navbar">
-      <h1 className="logo">AI Chat Dashboard</h1>
-
+      <h1 className="logo">AI Chat</h1>
       <div className="nav-actions">
-        <button className="btn primary">Logout</button>
+        <button className="btn primary" onClick={onLogout}>Logout</button>
         <button className="btn outline">Settings</button>
       </div>
     </div>

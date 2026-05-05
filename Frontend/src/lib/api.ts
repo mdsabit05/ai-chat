@@ -1,35 +1,127 @@
-const BASE = "http://127.0.0.1:8787";
+const BASE_URL = "http://127.0.0.1:8787";
 
-export async function createChat(title?: string) {
-  const res = await fetch(`${BASE}/chats`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+export const api = async (
+  path: string,
+  options: RequestInit = {}
+) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(BASE_URL + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && {
+        Authorization: `Bearer ${token}`,
+      }),
+      ...(options.headers || {}),
+    },
   });
-  if (!res.ok) throw new Error("createChat failed");
-  return res.json(); // { id, title }
-}
 
-export async function sendMessage(chatId: string, content: string) {
-  const res = await fetch(`${BASE}/messages`, {
+  return res.json();
+};
+export const signup = async (data: {
+  email: string;
+  password: string;
+  name: string;
+}) => {
+  const res = await api("/api/auth/signup", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chatId, content }),
+    body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("sendMessage failed");
-  return res.json(); // { user, ai }
-}
 
-export async function getMessages(chatId: string) {
-  const res = await fetch(`${BASE}/messages/${chatId}`);
-  if (!res.ok) throw new Error("getMessages failed");
-  return res.json(); // Message[]
-}
+  if (res.token) {
+    localStorage.setItem("token", res.token);
+    localStorage.setItem("userName", data.name); // 👈 save name
+  }
 
-export async function deleteChat(chatId: string) {
-  const res = await fetch(`${BASE}/chats/${chatId}`, {
+  return res;
+};
+
+export const login = async (data: {
+  email: string;
+  password: string;
+}) => {
+  const res = await api("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+  if (res.token) {
+    localStorage.setItem("token", res.token);
+    localStorage.setItem("userName", data.email.split("@")[0]); // 👈 use email prefix as fallback
+  }
+
+  return res;
+};
+export const getChats = () => {
+  return api("/chats");
+};
+export const deleteChat = (chatId: string) => {
+  return api(`/chats/${chatId}`, {
     method: "DELETE",
   });
+};
 
-  if (!res.ok) throw new Error("deleteChat failed");
-}
+export const createChat = async () => {
+  return api("/chats", { method: "POST" });
+};
+
+export const getMessages = (chatId: string) => {
+  return api(`/messages/${chatId}`);
+};
+
+export const sendMessage = async (
+  chatId: string,
+  content: string,
+  onToken: (token: string) => void
+): Promise<void> => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch("http://127.0.0.1:8787/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ chatId, content }),
+  });
+
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+
+    for (const line of lines) {
+      const data = line.replace("data: ", "").trim();
+      if (data === "[DONE]") continue;
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.token) onToken(parsed.token);
+      } catch {}
+    }
+  }
+};
+export const getCurrentUser = (): { userId: string } | null => {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload;
+  } catch {
+    return null;
+  }
+};
+
+
+export const updateChatTitle = (chatId: string, title: string) => {
+  return api(`/chats/${chatId}/title`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+};

@@ -158,3 +158,66 @@
 .empty-state h1 {
   letter-spacing: 0.5px;
 }
+
+
+/* typing dots animation */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.typing-indicator span {
+  width: 7px;
+  height: 7px;
+  background: #3bc1ff;
+  border-radius: 50%;
+  animation: bounce 1.2s infinite;
+}
+
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* error banner */
+.error-banner {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #7f1d1d;
+  color: #fca5a5;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+  border: 1px solid #991b1b;
+}
+
+.error-banner button {
+  background: transparent;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+}
+
+/* disabled input */
+.input-bar input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input-bar button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

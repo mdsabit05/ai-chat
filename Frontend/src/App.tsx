@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
+import Login from "./pages/Login";
 import "./App.css";
-import { createChat } from "./lib/api";
+import { createChat, getChats } from "./lib/api";
 
 type Message = {
   id: string;
@@ -20,58 +21,72 @@ type Chat = {
 function App() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-
-  // ✅ LOAD CHATS FROM BACKEND
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem("token")
+  );
+ const [userName, setUserName] = useState<string>(
+    localStorage.getItem("userName") || "User"
+  );
   useEffect(() => {
-    fetch("http://127.0.0.1:8787/chats")
-      .then((res) => res.json())
-  .then((data) => {
-  const formatted = data.map((chat: any) => ({
-    ...chat,
-    messages: [],
-  }));
+    if (!token) return;
+    getChats().then((data) => {
+      if (!Array.isArray(data)) return;
+      const formatted = data.map((chat: any) => ({
+        ...chat,
+        messages: [],
+      }));
+      setChats(formatted);
+      if (formatted.length > 0) setActiveChatId(formatted[0].id);
+    });
+  }, [token]);
 
-  setChats(formatted);
-  if (formatted.length > 0) {
-    setActiveChatId(formatted[0].id);
-  }
-})
-      .catch(console.error);
-  }, []);
-
-
-
-const handleNewChat = async () => {
-  const data = await createChat();
-
-  const newChat: Chat = {
-    id: data.id,
-    title: data.title,
-    messages: [],
+  const handleNewChat = async () => {
+    const data = await createChat();
+    const newChat: Chat = {
+      id: data.id,
+      title: "New Chat",
+      messages: [],
+    };
+    setChats((prev) => [newChat, ...prev]);
+    setActiveChatId(newChat.id);
   };
 
-  setChats((prev) => [newChat, ...prev]);
-  setActiveChatId(newChat.id);
-};
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+     localStorage.removeItem("userName");
+    setToken(null);
+    setChats([]);
+    setActiveChatId(null);
+  };
+
+    const handleLogin = (token: string) => {
+    setToken(token);
+    setUserName(localStorage.getItem("userName") || "User"); // 👈 read after login
+  };
+
+  // 👇 auth guard
+   if (!token) {
+    return <Login onLogin={handleLogin} />;
+  }
+
 
   return (
     <div className="div1">
-    <Sidebar
-  chats={chats}
-  activeChatId={activeChatId}
-  onSelectChat={setActiveChatId}
-  onNewChat={handleNewChat}
-  setChats={setChats}   // ✅ ADD THIS
-/>
-
+      <Sidebar
+        chats={chats}
+        activeChatId={activeChatId}
+        onSelectChat={setActiveChatId}
+        onNewChat={handleNewChat}
+        setChats={setChats}
+      />
       <div className="div2">
-        <Navbar />
-
+        <Navbar onLogout={handleLogout} />
         <div className="div3">
           <Home
             chats={chats}
             activeChatId={activeChatId}
             setChats={setChats}
+             userName={userName}
           />
         </div>
       </div>
