@@ -6,28 +6,27 @@
   flex-direction: column;
   background: #061a3a;
   color: white;
-  position: relative;
+  overflow: hidden;
 }
 
-/* chat scroll area */
 .chat-box {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  padding-bottom: 90px; 
+  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* fixed input at bottom */
-.input-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
 
+.input-bar {
+  position: static; 
   display: flex;
   padding: 15px;
   background: #061a3a;
   border-top: 1px solid #0f2a5c;
+  flex-shrink: 0;
 }
 
 .input-bar input {
@@ -60,14 +59,14 @@
 }
 
 .msg {
-  display: inline-block;        /* 👈 key change */
+  display: inline-block;     
   max-width: 60%;
   padding: 10px 14px;
   border-radius: 12px;
   margin-bottom: 10px;
   font-size: 14px;
   line-height: 1.5;
-  width: fit-content;           /* 👈 shrink to content */
+  width: fit-content;          
 }
 
 .msg.ai {
@@ -127,23 +126,26 @@
   color: black;
 }
 
-/* FINAL polished empty state (clean + modern like ChatGPT) */
+
 
 .empty-state {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   pointer-events: none;
+  position: static;
+  transform: none;  
 }
 
 /* heading */
 .empty-state h1 {
   font-size: 36px;
   font-weight: 600;
-  color: #cbd5f5;              /* 👈 clear but soft */
-  opacity: 0.6;               /* 👈 controlled fade */
+  color: #cbd5f5;           
+  opacity: 0.6;              
   margin-bottom: 8px;
 }
 
@@ -154,13 +156,13 @@
   opacity: 0.6;
 }
 
-/* subtle premium effect */
+
 .empty-state h1 {
   letter-spacing: 0.5px;
 }
 
 
-/* typing dots animation */
+
 .typing-indicator {
   display: flex;
   gap: 4px;
@@ -220,4 +222,38 @@
 .input-bar button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .welcome {
+    font-size: 16px;
+    margin: 12px;
+  }
+
+  .msg {
+    max-width: 85%;
+    font-size: 13px;
+  }
+
+  .input-bar {
+    padding: 10px;
+  }
+
+  .input-bar input {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .input-bar button {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .empty-state h1 {
+    font-size: 22px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+  }
 }

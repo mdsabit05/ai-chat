@@ -27,18 +27,27 @@ function App() {
  const [userName, setUserName] = useState<string>(
     localStorage.getItem("userName") || "User"
   );
-  useEffect(() => {
-    if (!token) return;
-    getChats().then((data) => {
-      if (!Array.isArray(data)) return;
-      const formatted = data.map((chat: any) => ({
-        ...chat,
-        messages: [],
-      }));
+ useEffect(() => {
+  if (!token) return;
+  getChats().then(async (data) => {
+    if (!Array.isArray(data)) return;
+    const formatted = data.map((chat: any) => ({
+      ...chat,
+      messages: [],
+    }));
+
+    if (formatted.length === 0) {
+      // auto-create first chat
+      const newChat = await createChat();
+      const first = { id: newChat.id, title: "New Chat", messages: [] };
+      setChats([first]);
+      setActiveChatId(first.id);
+    } else {
       setChats(formatted);
-      if (formatted.length > 0) setActiveChatId(formatted[0].id);
-    });
-  }, [token]);
+      setActiveChatId(formatted[0].id);
+    }
+  });
+}, [token]);
 
   const handleNewChat = async () => {
     const data = await createChat();

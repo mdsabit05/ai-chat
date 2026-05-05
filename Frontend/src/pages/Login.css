@@ -84,3 +84,14 @@
 .auth-switch span:hover {
   text-decoration: underline;
 }
+
+@media (max-width: 768px) {
+  .auth-box {
+    margin: 20px;
+    padding: 28px 20px;
+  }
+
+  .auth-title {
+    font-size: 22px;
+  }
+}

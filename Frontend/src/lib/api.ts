@@ -1,4 +1,5 @@
-const BASE_URL = "http://127.0.0.1:8787";
+// const BASE_URL = "http://127.0.0.1:8787";
+const BASE_URL = "https://backend.mdsabitrazabarkati.workers.dev";
 
 export const api = async (
   path: string,
@@ -77,7 +78,7 @@ export const sendMessage = async (
 ): Promise<void> => {
   const token = localStorage.getItem("token");
 
-  const res = await fetch("http://127.0.0.1:8787/api/chat", {
+  const res = await fetch(`${BASE_URL}/api/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -86,24 +87,9 @@ export const sendMessage = async (
     body: JSON.stringify({ chatId, content }),
   });
 
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
-
-    for (const line of lines) {
-      const data = line.replace("data: ", "").trim();
-      if (data === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(data);
-        if (parsed.token) onToken(parsed.token);
-      } catch {}
-    }
+  const data = await res.json() as any;
+  if (data.message) {
+    onToken(data.message); // send full message at once
   }
 };
 export const getCurrentUser = (): { userId: string } | null => {

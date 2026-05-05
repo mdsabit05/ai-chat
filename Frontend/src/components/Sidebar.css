@@ -1,4 +1,3 @@
-/* src/components/Sidebar.css (update) */
 
 .sidebar {
   width: 280px;
@@ -7,6 +6,9 @@
   border-right: 1px solid #0f2a5c;
   color: white;
   padding: 20px;
+  overflow-y: auto;
+  flex-shrink: 0; 
+  box-sizing: border-box; 
 }
 
 .sidebar h2 {
@@ -23,14 +25,14 @@
   background: #3bc1ff;
   border: none;
   color: black;
-  font-weight: 700;   /* 🔥 bold */
+  font-weight: 700;   
   font-size: 15px;
   cursor: pointer;
   margin-bottom: 20px;
 }
 .chat-item {
   display: flex;
-  justify-content: space-between;   /* 🔥 pushes X to right */
+  justify-content: space-between;   
   align-items: center;
   padding: 10px 12px;
   border-radius: 10px;
@@ -41,14 +43,14 @@
   margin-top: 8px;
 }
 
-/* active chat like Chat 1 */
+
 .chat-item.active {
   background: #0f2a5c;
-  border: 1px solid #3bc1ff;  /* 👈 border added */
+  border: 1px solid #3bc1ff; 
   color: #e2e8f0;
 }
 
-/* hover */
+
 .chat-item:hover {
   background: #0f2a5c;
 }
@@ -108,4 +110,28 @@
   padding: 4px 8px;
   outline: none;
   width: 100%;
+}
+
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid #0f2a5c;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .new-chat {
+    padding: 10px;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .chat-item {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
 }
