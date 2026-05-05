@@ -1,4 +1,3 @@
-
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { chats } from "./db/schema";
@@ -12,7 +11,7 @@ import { getDB } from "./db/index";
 
 export type Bindings = {
   OPENROUTER_API_KEY: string;
-  ai_chat_db: D1Database; // ✅ match binding name
+  ai_chat_db: D1Database;
   BETTER_AUTH_SECRET: string;
 };
 
@@ -23,9 +22,17 @@ const app = new Hono<{
   };
 }>();
 
-
 app.use("*", cors({
-  origin: "http://localhost:5173",
+  origin: (origin) => {
+    const allowed = [
+      "http://localhost:5173",
+      "https://ai-chat-frontend-3op.pages.dev",
+    ];
+    if (!origin || allowed.includes(origin) || origin.endsWith(".ai-chat-frontend-3op.pages.dev")) {
+      return origin;
+    }
+    return null;
+  },
   credentials: true,
   allowHeaders: ["Content-Type", "Authorization"],
   allowMethods: ["GET", "POST", "DELETE", "OPTIONS", "PATCH"]
@@ -34,7 +41,6 @@ app.use("*", cors({
 app.get("/", (c) => {
   return c.json({ message: "Backend running" });
 });
-
 
 // middleware
 const authMiddleware = async (c: Context, next: Next) => {
@@ -51,41 +57,159 @@ const authMiddleware = async (c: Context, next: Next) => {
   }
 };
 
+// get chats
 app.get("/chats", authMiddleware, async (c) => {
   const db = getDB(c);
   const userId = c.get("userId");
-
-  const result = await db
-    .select()
-    .from(chats)
-    .where(eq(chats.userId, userId)); // 👈 SECURITY
-
+  const result = await db.select().from(chats).where(eq(chats.userId, userId));
   return c.json(result);
 });
+
+// create chat
 app.post("/chats", authMiddleware, async (c) => {
   const db = getDB(c);
   const userId = c.get("userId");
-
   const id = uuidv4();
-
-  await db.insert(chats).values({
-    id,
-    title: "New Chat",
-    userId,
-  });
-
+  await db.insert(chats).values({ id, title: "New Chat", userId });
   return c.json({ id });
 });
+
+// get messages
+app.get("/messages/:chatId", authMiddleware, async (c) => {
+  const db = getDB(c);
+  const userId = c.get("userId");
+  const chatId = c.req.param("chatId");
+
+  const chat = await db.select().from(chats).where(eq(chats.id, chatId));
+  if (!chat[0]) return c.json({ error: "Not found" }, 404);
+  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
+
+  const rows = await db.select().from(messages).where(eq(messages.chatId, chatId));
+  return c.json(rows);
+});
+
+// post message
+app.post("/messages", authMiddleware, async (c) => {
+  const db = getDB(c);
+  const userId = c.get("userId");
+  const { chatId, content } = await c.req.json();
+
+  const chat = await db.select().from(chats).where(eq(chats.id, chatId));
+  if (!chat[0]) return c.json({ error: "Not found" }, 404);
+  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
+
+  await db.insert(messages).values({
+    id: uuidv4(),
+    chatId,
+    content,
+    role: "user",
+  });
+
+  return c.json({ success: true });
+});
+
+// delete chat
+app.delete("/chats/:id", authMiddleware, async (c) => {
+  const db = getDB(c);
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+
+  if (!id) return c.json({ error: "Missing id" }, 400);
+
+  const chat = await db.select().from(chats).where(eq(chats.id, id));
+  if (!chat[0]) return c.json({ error: "Not found" }, 404);
+  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
+
+  await db.delete(messages).where(eq(messages.chatId, id));
+  await db.delete(chats).where(eq(chats.id, id));
+
+  return c.json({ success: true });
+});
+
+// update chat title
+app.patch("/chats/:id/title", authMiddleware, async (c) => {
+  const db = getDB(c);
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const { title } = await c.req.json();
+
+  if (!title) return c.json({ error: "Missing title" }, 400);
+
+  const chat = await db.select().from(chats).where(eq(chats.id, id));
+  if (!chat[0]) return c.json({ error: "Not found" }, 404);
+  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
+
+  await db.update(chats).set({ title }).where(eq(chats.id, id));
+  return c.json({ success: true });
+});
+
+// signup
+app.post("/api/auth/signup", async (c) => {
+  const db = getDB(c);
+  const { email, password, name } = await c.req.json();
+
+  if (!email || !password) return c.json({ error: "Missing fields" }, 400);
+
+  const hashed = await hashPassword(password);
+  const id = uuidv4();
+
+  try {
+    await db.insert(user).values({
+      id,
+      email,
+      password: hashed,
+      name,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    const token = await generateToken(id, c.env.BETTER_AUTH_SECRET);
+    return c.json({ token });
+  } catch (err) {
+    return c.json({ error: "User exists or DB error" }, 400);
+  }
+});
+
+// login
+app.post("/api/auth/login", async (c) => {
+  try {
+    const body = await c.req.json();
+    const email = body.email;
+    const password = body.password;
+
+    if (!email || !password) return c.json({ error: "Missing fields" }, 400);
+
+    const db = getDB(c);
+    const result = await db.select().from(user).where(eq(user.email, email));
+    const existingUser = result[0];
+
+    if (!existingUser) return c.json({ error: "User not found" }, 400);
+
+    const isMatch = await comparePassword(password, existingUser.password);
+    if (!isMatch) return c.json({ error: "Invalid password" }, 400);
+
+    const token = await generateToken(existingUser.id, c.env.BETTER_AUTH_SECRET);
+    return c.json({ token });
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    return c.json({ error: "Server error" }, 500);
+  }
+});
+
+// protected test route
+app.get("/api/protected", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  return c.json({ message: "Authorized", userId });
+});
+
+// AI chat route
 app.post("/api/chat", authMiddleware, async (c) => {
   const db = getDB(c);
   const userId = c.get("userId");
   const { chatId, content } = await c.req.json();
 
-  if (!chatId || !content) {
-    return c.json({ error: "Missing chatId or content" }, 400);
-  }
+  if (!chatId || !content) return c.json({ error: "Missing chatId or content" }, 400);
 
-  // verify chat ownership
   const chat = await db.select().from(chats).where(eq(chats.id, chatId));
   if (!chat[0]) return c.json({ error: "Not found" }, 404);
   if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
@@ -98,26 +222,8 @@ app.post("/api/chat", authMiddleware, async (c) => {
     role: "user",
   });
 
-  // update chat title from first message
-const messageCount = await db
-  .select()
-  .from(messages)
-  .where(eq(messages.chatId, chatId));
-
-if (messageCount.length === 1) {
-  // this is the first message — use it as title
-  const title = content.slice(0, 40) + (content.length > 40 ? "..." : "");
-  await db
-    .update(chats)
-    .set({ title })
-    .where(eq(chats.id, chatId));
-}
-
-  // get chat history for context
-  const history = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.chatId, chatId));
+  // get chat history
+  const history = await db.select().from(messages).where(eq(messages.chatId, chatId));
 
   const formattedHistory = history.map((m) => ({
     role: m.role as "user" | "assistant",
@@ -132,250 +238,37 @@ if (messageCount.length === 1) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-     model: "openrouter/auto",
+      model: "anthropic/claude-opus-4.7",
       messages: formattedHistory,
-      stream: true,
+      max_tokens: 1000,
+      stream: false,
     }),
   });
 
+  const data = await response.json() as any;
+
   if (!response.ok) {
-    const err = await response.text();
-    console.error("OpenRouter error:", err);
+    console.error("OpenRouter error:", JSON.stringify(data));
     return c.json({ error: "AI error" }, 500);
   }
 
-  // stream back to frontend
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
+  const aiContent = data.choices?.[0]?.message?.content ?? "";
 
-  let fullResponse = "";
-
-  // process stream in background
-  (async () => {
-    const reader = response.body!.getReader();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
-
-        for (const line of lines) {
-          const data = line.replace("data: ", "").trim();
-          if (data === "[DONE]") continue;
-
-          try {
-            const parsed = JSON.parse(data);
-            const token = parsed.choices?.[0]?.delta?.content;
-            if (token) {
-              fullResponse += token;
-              await writer.write(encoder.encode(`data: ${JSON.stringify({ token })}\n\n`));
-            }
-          } catch {}
-        }
-      }
-
-      // save AI response to DB after stream ends
-      await db.insert(messages).values({
-        id: uuidv4(),
-        chatId,
-        content: fullResponse,
-        role: "assistant",
-      });
-
-    } finally {
-      await writer.close();
-    }
-  })();
-  
-
-  return new Response(readable, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Access-Control-Allow-Origin": "http://localhost:5173",
-    },
-  });
-});
-
-// GET — add auth + ownership check
-app.get("/messages/:chatId", authMiddleware, async (c) => {
-  const db = getDB(c);
-  const userId = c.get("userId");
-  const chatId = c.req.param("chatId");
-
-  // verify the chat belongs to this user
-  const chat = await db.select().from(chats).where(eq(chats.id, chatId));
-  if (!chat[0]) return c.json({ error: "Not found" }, 404);
-  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
-
-  const rows = await db.select().from(messages).where(eq(messages.chatId, chatId));
-  return c.json(rows);
-});
-
-// POST — add ownership check
-app.post("/messages", authMiddleware, async (c) => {
-  const db = getDB(c);
-  const userId = c.get("userId");
-  const { chatId, content } = await c.req.json();
-
-  // verify the chat belongs to this user
-  const chat = await db.select().from(chats).where(eq(chats.id, chatId));
-  if (!chat[0]) return c.json({ error: "Not found" }, 404);
-  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
-
+  // save AI response
   await db.insert(messages).values({
     id: uuidv4(),
     chatId,
-    content,
-    role: "user",
+    content: aiContent,
+    role: "assistant",
   });
 
-  return c.json({ success: true });
-});
-
-app.delete("/chats/:id", authMiddleware, async (c) => {
-  const db = getDB(c); 
-  const userId = c.get("userId");
-
-  const id = c.req.param("id");
-
-if (!id) {
-  return c.json({ error: "Missing id" }, 400);
-}
-
-  // 🔍 check chat exists
-  const chat = await db
-    .select()
-    .from(chats)
-    .where(eq(chats.id, id));
-
-  if (!chat[0]) {
-    return c.json({ error: "Not found" }, 404);
+  // update title from first message
+  if (history.length === 1) {
+    const title = content.slice(0, 40) + (content.length > 40 ? "..." : "");
+    await db.update(chats).set({ title }).where(eq(chats.id, chatId));
   }
 
-  // 🔒 check ownership
-  if (chat[0].userId !== userId) {
-    return c.json({ error: "Unauthorized" }, 403);
-  }
-
-  // 🧹 delete messages first
-  await db.delete(messages).where(eq(messages.chatId, id));
-
-  // 🗑 delete chat
-  await db.delete(chats).where(eq(chats.id, id));
-
-  return c.json({ success: true });
-});
-// signUp 
-
-app.post("/api/auth/signup", async (c) => {
-  const db = getDB(c);
-
-  const { email, password, name } = await c.req.json();
-
-  if (!email || !password) {
-    return c.json({ error: "Missing fields" }, 400);
-  }
-
-  const hashed = await hashPassword(password);
-
-  const id = uuidv4();
-
-  try {
-    await db.insert(user).values({
-      id,
-      email,
-      password: hashed,
-      name,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-
-    const token = await generateToken(id, c.env.BETTER_AUTH_SECRET);
-
-    return c.json({ token });
-  } catch (err) {
-    return c.json({ error: "User exists or DB error" }, 400);
-  }
-});
-
-// login 
-app.post("/api/auth/login", async (c) => {
-  try {
-   const body = await c.req.json();
-
-console.log("BODY:", body); // debug
-
-const email = body.email;
-const password = body.password;
-
-if (!email || !password) {
-  return c.json({ error: "Missing fields" }, 400);
-}
-
-    console.log("LOGIN INPUT:", email, password);
-
-   const db = getDB(c);
-
-    const result = await db
-      .select()
-      .from(user)
-      .where(eq(user.email, email));
-
-    console.log("DB RESULT:", result); 
-
-    const existingUser = result[0];
-
-    if (!existingUser) {
-      return c.json({ error: "User not found" }, 400);
-    }
-
-    console.log("USER FROM DB:", existingUser);
-
-    const isMatch = await comparePassword(password, existingUser.password);
-
-    console.log("PASSWORD MATCH:", isMatch);
-
-    if (!isMatch) {
-      return c.json({ error: "Invalid password" }, 400);
-    }
-
-   const token = await generateToken(existingUser.id, c.env.BETTER_AUTH_SECRET);
-
-    return c.json({ token });
-
-  } catch (err) {
-    console.error("LOGIN ERROR:", err); // 👈 CRITICAL
-    return c.json({ error: "Server error" }, 500);
-  }
-});
-
-app.get("/api/protected", authMiddleware, async (c) => {
-  const userId = c.get("userId");
-  return c.json({ message: "Authorized", userId });
-});
-
-app.patch("/chats/:id/title", authMiddleware, async (c) => {
-  const db = getDB(c);
-  const userId = c.get("userId");
-  const id = c.req.param("id");
-  const { title } = await c.req.json();
-
-  if (!title) return c.json({ error: "Missing title" }, 400);
-
-  const chat = await db.select().from(chats).where(eq(chats.id, id));
-  if (!chat[0]) return c.json({ error: "Not found" }, 404);
-  if (chat[0].userId !== userId) return c.json({ error: "Unauthorized" }, 403);
-
-  await db.update(chats).set({ title }).where(eq(chats.id, id));
-
-  return c.json({ success: true });
+  return c.json({ message: aiContent });
 });
 
 export default app;
-
