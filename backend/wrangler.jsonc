@@ -4,16 +4,18 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-05-02",
 	"vars": {
-    "OPENROUTER_API_KEY": "sk-xxxx"
-  },
+		"OPENROUTER_API_KEY": "sk-xxxx"
+	},
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"d1_databases": [
 		{
-			"binding": "DB",
+			"binding": "ai_chat_db",
 			"database_name": "ai-chat-db",
-			"database_id": "95418f15-300e-4bc1-b33d-bc6a1d021383",
+			"database_id": "a4a25a28-9427-44bf-b3e2-74f0eed7b429",
 			"remote": true
 		}
-		
 	]
 	// "compatibility_flags": [
 	//   "nodejs_compat"
